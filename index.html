@@ -562,9 +562,9 @@ function drawDetail(){
   document.getElementById('detail').innerHTML=h;
 }
 function drawUp(){
-  var u=ITEMS.filter(function(e){return e.type==='agenda'&&e.d>=todayK}),h='';
-  u.forEach(function(e){var p=e.d.split('-');h+='<button class="up" data-k="'+e.d+'"><span class="code">'+(+p[2])+'/'+(+p[1])+'<\/span><span>'+esc(e.t)+(e.jm?' \u00b7 '+e.jm.replace(':','.')+' WIB':'')+'<\/span><\/button>'});
-  document.getElementById('upcoming').innerHTML=h||'<p class="mu">Belum ada agenda.<\/p>';
+  var u=ITEMS.filter(function(e){return e.d>=todayK}).sort(function(a,b){var x=a.d+(a.jm||''),y=b.d+(b.jm||'');return x<y?-1:(x>y?1:0)}),h='';
+  u.forEach(function(e){var p=e.d.split('-');h+='<button class="up" data-k="'+e.d+'"><span class="code">'+(+p[2])+'/'+(+p[1])+'<\/span><span>'+esc(e.t)+(e.type==='info'?' <span class="mu">(Informasi)<\/span>':'')+(e.jm?' \u00b7 '+e.jm.replace(':','.')+' WIB':'')+'<\/span><\/button>'});
+  document.getElementById('upcoming').innerHTML=h||'<p class="mu">Belum ada agenda atau informasi.<\/p>';
 }
 function pick(k){sel=k;vy=+k.slice(0,4);vm=+k.slice(5,7)-1;drawCal();drawDetail()}
 document.getElementById('days').addEventListener('click',function(e){var k=e.target.closest('.day');if(k)pick(k.dataset.k)});
@@ -636,9 +636,12 @@ function rowsOf(k,np){var J=JADWAL[k];if(!J)return null;return WIL.map(function(
   if(N&&N.lab)labs=labs.concat(N.lab);if(!np&&prepNext(k,i))labs.push('Persiapan Perjamuan Kudus untuk Minggu Depan oleh Majelis Wilayah '+WIL[i][0]+' ('+WIL[i][1]+')');
   return {kode:w[0],nama:w[1],jam:w[2],petugas:FULL[nm]||nm,pdt:pdt,warna:pdt?(PDT[nm]||'#d9d9d9'):null,ket:PN[nm]||'',labs:labs,det:(N&&N.t)||[]}})}
 function wartaData(k){
-  var k2=addDays(k,7);
-  return {k:k,tgl:fmt(k),I:IBADAH[k]||null,I2:IBADAH[addDays(k,7)]||null,rows:rowsOf(k),k2:JADWAL[k2]?k2:null,rows2:rowsOf(k2,1),prep:(rowsOf(k2)||[]).filter(function(r){return r.labs.indexOf('Perjamuan Kudus')>=0}).map(function(r){return r.kode+' ('+r.nama+')'}),
-    info:ITEMS.filter(function(e){return e.d>=k&&e.d<=addDays(k,14)}).sort(function(a,b){return (a.d+(a.jm||''))<(b.d+(b.jm||''))?-1:((a.d+(a.jm||''))>(b.d+(b.jm||''))?1:0)})};
+  var k2=addDays(k,7),r2=rowsOf(k2);
+  var prep=(r2||[]).filter(function(r){return r.labs.indexOf('Perjamuan Kudus')>=0}).map(function(r){return r.kode+' ('+r.nama+')'});
+  var ann=ITEMS.filter(function(e){return e.d>=k&&e.d<=addDays(k,14)});
+  if(prep.length&&JADWAL[k2])ann.push({d:k2,jm:'',type:'auto',t:'Perjamuan Kudus',w:'',tp:'',k:'Persiapan dilakukan oleh majelis wilayah '+prep.join(', ')+' pada minggu ini.'});
+  ann.sort(function(a,b){var x=a.d+(a.jm||''),y=b.d+(b.jm||'');return x<y?-1:(x>y?1:0)});
+  return {k:k,tgl:fmt(k),I:IBADAH[k]||null,I2:IBADAH[k2]||null,rows:rowsOf(k),k2:JADWAL[k2]?k2:null,rows2:rowsOf(k2,1),prep:prep,ann:ann};
 }
 function wtable(rows){
   if(!rows)return '<p class="mu">Belum tersedia.<\/p>';
@@ -659,14 +662,13 @@ function wartaHtml(d){
     if(I.s)h+='<p class="wa"><b>Nyanyian:<\/b><br>'+I.s.map(function(x){return esc(x[0])+': '+esc(x[1])}).join('<br>')+'<\/p>'}
   else h+='<p class="mu">Belum ada di SAH.<\/p>';
   h+='<h3 class="ws">3. Pengumuman<\/h3>';
-  if(d.prep.length)h+='<div class="wa"><b>Persiapan Perjamuan Kudus - '+esc(fmt(d.k2))+'<\/b><div>Persiapan dilakukan oleh majelis wilayah '+esc(d.prep.join(', '))+' pada minggu ini.<\/div><\/div>';
-  if(d.info.length)d.info.forEach(function(e){
-    h+='<div class="wa"><b>'+esc(fmt(e.d))+' - '+esc(e.t)+'<\/b>'+(e.type==='info'?' <span class="mu">(Informasi)<\/span>':'');
+  if(d.ann.length)d.ann.forEach(function(e){
+    h+='<div class="wa"><b>'+esc(fmt(e.d))+'<\/b><div style="font-weight:600">'+esc(e.t)+(e.type==='info'?' <span class="mu" style="font-weight:400">(Informasi)<\/span>':'')+'<\/div>';
     if(tm(e))h+='<div class="mu">Waktu: '+esc(tm(e))+'<\/div>';
     if(e.tp)h+='<div class="mu">Tempat: '+esc(e.tp)+'<\/div>';
     if(e.k)h+='<div>'+esc(e.k).replace(/\n/g,'<br>')+'<\/div>';
     h+='<\/div>'});
-  else if(!d.prep.length)h+='<p class="mu">Tidak ada pengumuman untuk dua minggu ke depan.<\/p>';
+  else h+='<p class="mu">Tidak ada pengumuman untuk dua minggu ke depan.<\/p>';
   h+='<h3 class="ws">4. Jadwal Pelayanan Majelis Minggu Depan'+(d.k2?' ('+esc(fmt(d.k2))+')':'')+'<\/h3>'+(d.I2?'<p class="wa"><b>'+esc(d.I2.n)+'<\/b> \u00b7 warna liturgi '+esc(d.I2.w)+'<br><b>Tema:<\/b> '+esc(d.I2.t)+'<br><b>Bacaan:<\/b> '+esc(d.I2.f)+'<\/p>':'')+wtable(d.rows2);
   return h+'<p class="wf">Majelis Pimpinan Jemaat GKSBS Purwodadi<\/p><\/div>';
 }
@@ -719,18 +721,20 @@ function makePdf(k){
   else txt('Tema dan bacaan belum ada di SAH.',{i:1,s:10,c:MU});
   head('1. Jadwal Pelayanan Majelis');table(d.rows);
   head('2. Nas dan Nyanyian');
-  if(d.I&&d.I.p){txt('Pembimbing: '+d.I.p,{s:10});txt('Berita Anugerah: '+d.I.b,{s:10});txt('Persembahan: '+d.I.o,{s:10,g:1.5});
-    if(d.I.s)txt('Nyanyian: '+d.I.s.map(function(x){return x[0]+' '+x[1]}).join('; '),{s:10})}
+  if(d.I&&d.I.p){
+    txt('Nas',{b:1,s:10});
+    txt('Pembimbing: '+d.I.p,{s:10,x:M+4});txt('Berita Anugerah: '+d.I.b,{s:10,x:M+4});txt('Persembahan: '+d.I.o,{s:10,x:M+4,g:1.5});
+    if(d.I.s){txt('Nyanyian',{b:1,s:10});d.I.s.forEach(function(x){txt(x[0]+': '+x[1],{s:10,x:M+4})})}}
   else txt('Belum ada di SAH.',{i:1,s:10,c:MU});
   head('3. Pengumuman');
-  if(d.prep.length){txt('Persiapan Perjamuan Kudus - '+fmt(d.k2),{b:1,s:10});txt('Persiapan dilakukan oleh majelis wilayah '+d.prep.join(', ')+' pada minggu ini.',{s:9.5,c:MU,x:M+4,g:1.5})}
-  if(d.info.length)d.info.forEach(function(e){
-    txt(fmt(e.d)+' - '+e.t+(e.type==='info'?' (Informasi)':''),{b:1,s:10});
-    var ex=[];if(tm(e))ex.push('Waktu: '+tm(e));if(e.tp)ex.push('Tempat: '+e.tp);
-    if(ex.length)txt(ex.join('  |  '),{s:9.5,c:MU,x:M+4});
+  if(d.ann.length)d.ann.forEach(function(e){
+    txt(fmt(e.d),{b:1,s:10});
+    txt(e.t+(e.type==='info'?' (Informasi)':''),{s:10,x:M+4});
+    if(tm(e))txt('Waktu: '+tm(e),{s:9.5,c:MU,x:M+4});
+    if(e.tp)txt('Tempat: '+e.tp,{s:9.5,c:MU,x:M+4});
     if(e.k)txt(e.k,{s:9.5,x:M+4});
     y+=1.5});
-  else if(!d.prep.length)txt('Tidak ada pengumuman untuk dua minggu ke depan.',{i:1,s:10,c:MU});
+  else txt('Tidak ada pengumuman untuk dua minggu ke depan.',{i:1,s:10,c:MU});
   head('4. Jadwal Pelayanan Majelis Minggu Depan'+(d.k2?' ('+fmt(d.k2)+')':''));
   if(d.I2){txt(d.I2.n+' - warna liturgi '+d.I2.w,{b:1,s:10.5});txt('Tema: '+d.I2.t,{s:10.5});txt('Bacaan: '+d.I2.f,{s:10.5,g:1.5})}
   table(d.rows2);
@@ -896,9 +900,9 @@ function drawDetail(){
   document.getElementById('detail').innerHTML=h;
 }
 function drawUp(){
-  var u=ITEMS.filter(function(e){return e.type==='agenda'&&e.d>=todayK}),h='';
-  u.forEach(function(e){var p=e.d.split('-');h+='<button class="up" data-k="'+e.d+'"><span class="code">'+(+p[2])+'/'+(+p[1])+'</span><span>'+esc(e.t)+(e.jm?' \u00b7 '+e.jm.replace(':','.')+' WIB':'')+'</span></button>'});
-  document.getElementById('upcoming').innerHTML=h||'<p class="mu">Belum ada agenda.</p>';
+  var u=ITEMS.filter(function(e){return e.d>=todayK}).sort(function(a,b){var x=a.d+(a.jm||''),y=b.d+(b.jm||'');return x<y?-1:(x>y?1:0)}),h='';
+  u.forEach(function(e){var p=e.d.split('-');h+='<button class="up" data-k="'+e.d+'"><span class="code">'+(+p[2])+'/'+(+p[1])+'</span><span>'+esc(e.t)+(e.type==='info'?' <span class="mu">(Informasi)</span>':'')+(e.jm?' \u00b7 '+e.jm.replace(':','.')+' WIB':'')+'</span></button>'});
+  document.getElementById('upcoming').innerHTML=h||'<p class="mu">Belum ada agenda atau informasi.</p>';
 }
 function pick(k){sel=k;vy=+k.slice(0,4);vm=+k.slice(5,7)-1;drawCal();drawDetail()}
 document.getElementById('days').addEventListener('click',function(e){var k=e.target.closest('.day');if(k)pick(k.dataset.k)});
@@ -970,9 +974,12 @@ function rowsOf(k,np){var J=JADWAL[k];if(!J)return null;return WIL.map(function(
   if(N&&N.lab)labs=labs.concat(N.lab);if(!np&&prepNext(k,i))labs.push('Persiapan Perjamuan Kudus untuk Minggu Depan oleh Majelis Wilayah '+WIL[i][0]+' ('+WIL[i][1]+')');
   return {kode:w[0],nama:w[1],jam:w[2],petugas:FULL[nm]||nm,pdt:pdt,warna:pdt?(PDT[nm]||'#d9d9d9'):null,ket:PN[nm]||'',labs:labs,det:(N&&N.t)||[]}})}
 function wartaData(k){
-  var k2=addDays(k,7);
-  return {k:k,tgl:fmt(k),I:IBADAH[k]||null,I2:IBADAH[addDays(k,7)]||null,rows:rowsOf(k),k2:JADWAL[k2]?k2:null,rows2:rowsOf(k2,1),prep:(rowsOf(k2)||[]).filter(function(r){return r.labs.indexOf('Perjamuan Kudus')>=0}).map(function(r){return r.kode+' ('+r.nama+')'}),
-    info:ITEMS.filter(function(e){return e.d>=k&&e.d<=addDays(k,14)}).sort(function(a,b){return (a.d+(a.jm||''))<(b.d+(b.jm||''))?-1:((a.d+(a.jm||''))>(b.d+(b.jm||''))?1:0)})};
+  var k2=addDays(k,7),r2=rowsOf(k2);
+  var prep=(r2||[]).filter(function(r){return r.labs.indexOf('Perjamuan Kudus')>=0}).map(function(r){return r.kode+' ('+r.nama+')'});
+  var ann=ITEMS.filter(function(e){return e.d>=k&&e.d<=addDays(k,14)});
+  if(prep.length&&JADWAL[k2])ann.push({d:k2,jm:'',type:'auto',t:'Perjamuan Kudus',w:'',tp:'',k:'Persiapan dilakukan oleh majelis wilayah '+prep.join(', ')+' pada minggu ini.'});
+  ann.sort(function(a,b){var x=a.d+(a.jm||''),y=b.d+(b.jm||'');return x<y?-1:(x>y?1:0)});
+  return {k:k,tgl:fmt(k),I:IBADAH[k]||null,I2:IBADAH[k2]||null,rows:rowsOf(k),k2:JADWAL[k2]?k2:null,rows2:rowsOf(k2,1),prep:prep,ann:ann};
 }
 function wtable(rows){
   if(!rows)return '<p class="mu">Belum tersedia.</p>';
@@ -993,14 +1000,13 @@ function wartaHtml(d){
     if(I.s)h+='<p class="wa"><b>Nyanyian:</b><br>'+I.s.map(function(x){return esc(x[0])+': '+esc(x[1])}).join('<br>')+'</p>'}
   else h+='<p class="mu">Belum ada di SAH.</p>';
   h+='<h3 class="ws">3. Pengumuman</h3>';
-  if(d.prep.length)h+='<div class="wa"><b>Persiapan Perjamuan Kudus - '+esc(fmt(d.k2))+'</b><div>Persiapan dilakukan oleh majelis wilayah '+esc(d.prep.join(', '))+' pada minggu ini.</div></div>';
-  if(d.info.length)d.info.forEach(function(e){
-    h+='<div class="wa"><b>'+esc(fmt(e.d))+' - '+esc(e.t)+'</b>'+(e.type==='info'?' <span class="mu">(Informasi)</span>':'');
+  if(d.ann.length)d.ann.forEach(function(e){
+    h+='<div class="wa"><b>'+esc(fmt(e.d))+'</b><div style="font-weight:600">'+esc(e.t)+(e.type==='info'?' <span class="mu" style="font-weight:400">(Informasi)</span>':'')+'</div>';
     if(tm(e))h+='<div class="mu">Waktu: '+esc(tm(e))+'</div>';
     if(e.tp)h+='<div class="mu">Tempat: '+esc(e.tp)+'</div>';
     if(e.k)h+='<div>'+esc(e.k).replace(/\n/g,'<br>')+'</div>';
     h+='</div>'});
-  else if(!d.prep.length)h+='<p class="mu">Tidak ada pengumuman untuk dua minggu ke depan.</p>';
+  else h+='<p class="mu">Tidak ada pengumuman untuk dua minggu ke depan.</p>';
   h+='<h3 class="ws">4. Jadwal Pelayanan Majelis Minggu Depan'+(d.k2?' ('+esc(fmt(d.k2))+')':'')+'</h3>'+(d.I2?'<p class="wa"><b>'+esc(d.I2.n)+'</b> \u00b7 warna liturgi '+esc(d.I2.w)+'<br><b>Tema:</b> '+esc(d.I2.t)+'<br><b>Bacaan:</b> '+esc(d.I2.f)+'</p>':'')+wtable(d.rows2);
   return h+'<p class="wf">Majelis Pimpinan Jemaat GKSBS Purwodadi</p></div>';
 }
@@ -1053,18 +1059,20 @@ function makePdf(k){
   else txt('Tema dan bacaan belum ada di SAH.',{i:1,s:10,c:MU});
   head('1. Jadwal Pelayanan Majelis');table(d.rows);
   head('2. Nas dan Nyanyian');
-  if(d.I&&d.I.p){txt('Pembimbing: '+d.I.p,{s:10});txt('Berita Anugerah: '+d.I.b,{s:10});txt('Persembahan: '+d.I.o,{s:10,g:1.5});
-    if(d.I.s)txt('Nyanyian: '+d.I.s.map(function(x){return x[0]+' '+x[1]}).join('; '),{s:10})}
+  if(d.I&&d.I.p){
+    txt('Nas',{b:1,s:10});
+    txt('Pembimbing: '+d.I.p,{s:10,x:M+4});txt('Berita Anugerah: '+d.I.b,{s:10,x:M+4});txt('Persembahan: '+d.I.o,{s:10,x:M+4,g:1.5});
+    if(d.I.s){txt('Nyanyian',{b:1,s:10});d.I.s.forEach(function(x){txt(x[0]+': '+x[1],{s:10,x:M+4})})}}
   else txt('Belum ada di SAH.',{i:1,s:10,c:MU});
   head('3. Pengumuman');
-  if(d.prep.length){txt('Persiapan Perjamuan Kudus - '+fmt(d.k2),{b:1,s:10});txt('Persiapan dilakukan oleh majelis wilayah '+d.prep.join(', ')+' pada minggu ini.',{s:9.5,c:MU,x:M+4,g:1.5})}
-  if(d.info.length)d.info.forEach(function(e){
-    txt(fmt(e.d)+' - '+e.t+(e.type==='info'?' (Informasi)':''),{b:1,s:10});
-    var ex=[];if(tm(e))ex.push('Waktu: '+tm(e));if(e.tp)ex.push('Tempat: '+e.tp);
-    if(ex.length)txt(ex.join('  |  '),{s:9.5,c:MU,x:M+4});
+  if(d.ann.length)d.ann.forEach(function(e){
+    txt(fmt(e.d),{b:1,s:10});
+    txt(e.t+(e.type==='info'?' (Informasi)':''),{s:10,x:M+4});
+    if(tm(e))txt('Waktu: '+tm(e),{s:9.5,c:MU,x:M+4});
+    if(e.tp)txt('Tempat: '+e.tp,{s:9.5,c:MU,x:M+4});
     if(e.k)txt(e.k,{s:9.5,x:M+4});
     y+=1.5});
-  else if(!d.prep.length)txt('Tidak ada pengumuman untuk dua minggu ke depan.',{i:1,s:10,c:MU});
+  else txt('Tidak ada pengumuman untuk dua minggu ke depan.',{i:1,s:10,c:MU});
   head('4. Jadwal Pelayanan Majelis Minggu Depan'+(d.k2?' ('+fmt(d.k2)+')':''));
   if(d.I2){txt(d.I2.n+' - warna liturgi '+d.I2.w,{b:1,s:10.5});txt('Tema: '+d.I2.t,{s:10.5});txt('Bacaan: '+d.I2.f,{s:10.5,g:1.5})}
   table(d.rows2);
